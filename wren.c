@@ -10,7 +10,6 @@
 
 #include <assert.h>
 #include <ctype.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -712,13 +711,14 @@ static void block_prev (void)
 enum { unread = EOF - 1 };
 static int input_char = unread;
 static int token;
+static FILE *in_file;
 static wValue token_value;
-static char token_name[16];
+static char token_name[17]; // 16 + NUL
 
 static int ch (void)
 {
     if (input_char == unread)
-        input_char = getc(stdin);
+        input_char = getc(in_file);
     return input_char;
 }
 
@@ -1134,11 +1134,11 @@ static wValue scratch_expr (void)
     }
 }
 
-static void run_expr (void)
+static void run_expr (FILE *outp)
 {
     wValue v = scratch_expr();
-    if (!complaint)
-        printf("%"PRVAL"\n", v);
+    if (!complaint && NULL != outp)
+        fprintf(outp, "%"PRVAL"\n", v);
 }
 
 static void run_let (void)
@@ -1225,7 +1225,7 @@ static void run_fun (void)
     }
 }
 
-static void run_command (void)
+static void run_command (FILE *outp)
 {
 
     skip_newline();
@@ -1245,14 +1245,40 @@ static void run_command (void)
         run_forget();
     }
     else
-        run_expr();
+        run_expr(outp);
 
     if (complaint)
     {
-        printf("%s\n", complaint);
+        fprintf(stderr, "%s\n", complaint);
         skip_line();  /* i.e., flush any buffered input, sort of */
         next();
     }
+}
+
+/**
+* @brief wren_load_file -- loads a file into wren interpreter
+* ; similar to wren_read_eval_print_loop but without the prompts or print of expression results
+*/
+void wren_load_file (FILE *fp)
+{
+    FILE *saved_in_file = in_file;
+
+    in_file = fp; // set the input source
+
+    // just like wren_read_eval_print_loop but no prompts or printing results
+    //
+    next_char();
+    complaint = NULL;
+    next();
+    while (token != EOF)
+    {
+        run_command(NULL);
+        skip_newline();
+        complaint = NULL;
+    }
+
+    input_char = unread;
+    in_file = saved_in_file; // restore the input source
 }
 
 /**
@@ -1267,7 +1293,7 @@ void wren_read_eval_print_loop (void)
     next();
     while (token != EOF)
     {
-        run_command();
+        run_command(stdout);
         printf("> ");
         skip_newline();
         complaint = NULL;
@@ -1317,18 +1343,46 @@ void wren_initialize (void)
     bind("c0", 2, a_global, 2 * sizeof(wValue));
     bind("d0", 2, a_global, 3 * sizeof(wValue));
     compiler_ptr = the_store + (4 * sizeof(wValue));
+    in_file = stdin;
 }
 
 #if WREN_STANDALONE
 
-int main ()
+int main (int argc, char **argv)
 {
+    int i = 1;
+    int skip_repl = 0;
+
     wren_initialize();
 
     wren_bind_c_function("tstfn2", tstfn2, 2);
     wren_bind_c_function("tstfn0", tstfn0, 0);
 
-    wren_read_eval_print_loop();
+    while (i < argc)
+    {
+        if (strcmp(argv[i], "-f") == 0)
+        {
+            skip_repl = 1;
+        }
+        else
+        {
+            FILE *fp = fopen(argv[i], "r");
+            if (NULL != fp)
+            {
+                wren_load_file(fp);
+                fclose(fp);
+            }
+            else
+            {
+                //printf("Cannot open %s for reading, error: %d\n", argv[i], errno);
+                printf("Cannot open arg %d %s for reading\n", i, argv[i]);
+            }
+        }
+        i += 1;
+    }
+
+    if (!skip_repl) wren_read_eval_print_loop();
+
     return 0;
 }
 

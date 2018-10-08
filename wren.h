@@ -14,6 +14,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stdio.h>
 
 /* ############## Configuration ############## */
 
@@ -63,6 +64,8 @@ typedef wValue (*apply_t)();
 void wren_initialize (void);
 
 void wren_bind_c_function (const char *name, apply_t fn, const uint8_t arity);
+
+void wren_load_file (FILE *fp);
 
 void wren_read_eval_print_loop (void);
 
