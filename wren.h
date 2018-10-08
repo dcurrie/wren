@@ -17,7 +17,6 @@ extern "C" {
 
 /* ############## Configuration ############## */
 
-
 /** @def WREN_UNALIGNED_ACCESS_OK
 * @brief non-zero enables reads and writes of multi-byte values from/to unaligned addresses.
 * Default to safe mode: no unaligned accesses.
@@ -25,6 +24,17 @@ extern "C" {
 #ifndef WREN_UNALIGNED_ACCESS_OK
 #define WREN_UNALIGNED_ACCESS_OK (0)
 #endif
+
+/** @def WREN_STANDALONE
+* @brief non-zero enables main() with command line config and read-eval-print loop.
+* Default to standalone; set to 0 if you want to use Wren as a library.
+*/
+#ifndef WREN_STANDALONE
+#define WREN_STANDALONE (1)
+#endif
+
+
+/* ################## Types ################## */
 
 /** Type of a Wren-language value. Must be capable of holding a pointer or an integer
 */
@@ -48,7 +58,13 @@ typedef intptr_t wValue;
 
 /* ################### API ################### */
 
-// TODO: init, bind_c_function, read_eval_print_loop
+typedef wValue (*apply_t)();
+
+void wren_initialize (void);
+
+void wren_bind_c_function (const char *name, apply_t fn, const uint8_t arity);
+
+void wren_read_eval_print_loop (void);
 
 #ifdef __cplusplus
 }

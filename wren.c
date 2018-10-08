@@ -344,7 +344,6 @@ static void dump_dictionary (void)
 
 /* Call to C functions; see bind_c_function and CCALL prim */
 
-typedef wValue (*apply_t)();
 static long ccall(apply_t fn, wValue *args, unsigned arity)
 {
   switch (arity)
@@ -1256,8 +1255,11 @@ static void run_command (void)
     }
 }
 
-/* The top level */
-static void read_eval_print_loop (void)
+/**
+* @brief wren_read_eval_print_loop - The top level
+* ; does not return until stdin runs out of characters!
+*/
+void wren_read_eval_print_loop (void)
 {
     printf("> ");
     next_char();
@@ -1273,6 +1275,8 @@ static void read_eval_print_loop (void)
     printf("\n");
 }
 
+// Test CCALL C functions
+
 static wValue tstfn2 (wValue a1, wValue a2)
 {
     printf("tstfn2: %"PRVAL"\t%"PRVAL"\n", a1, a2);
@@ -1285,14 +1289,25 @@ static wValue tstfn0 (void)
     return 13;
 }
 
-static void bind_c_function (const char *name, apply_t fn, const unsigned arity)
+/**
+* @brief wren_bind_c_function - create binding for C function callable by wren code
+* 
+* @param[in] name  - new wren function name
+* @param[in] fn    - the C function of type apply_t
+* @param[in] arity - number of arguments to the C funciton (must be < 8)
+*/
+void wren_bind_c_function (const char *name, apply_t fn, const uint8_t arity)
 {
     (void )bind(name, strlen(name), a_cfunction, compiler_ptr - the_store);
     gen_ubyte(arity);
     gen_value((wValue )fn);
 }
 
-int main ()
+/**
+* @brief wren_initialize - create initial dictionary
+* ; must be called before any other wren_functions
+*/
+void wren_initialize (void)
 {
     ((wValue *)the_store)[2] = (wValue )the_store;
     ((wValue *)the_store)[3] = (wValue )store_end;
@@ -1301,13 +1316,20 @@ int main ()
     bind("dp", 2, a_global, 1 * sizeof(wValue));
     bind("c0", 2, a_global, 2 * sizeof(wValue));
     bind("d0", 2, a_global, 3 * sizeof(wValue));
-
     compiler_ptr = the_store + (4 * sizeof(wValue));
+}
 
-    bind_c_function("tstfn2", tstfn2, 2);
-    bind_c_function("tstfn0", tstfn0, 0);
+#if WREN_STANDALONE
 
-    read_eval_print_loop();
+int main ()
+{
+    wren_initialize();
+
+    wren_bind_c_function("tstfn2", tstfn2, 2);
+    wren_bind_c_function("tstfn0", tstfn0, 0);
+
+    wren_read_eval_print_loop();
     return 0;
 }
 
+#endif

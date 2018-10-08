@@ -2,10 +2,18 @@ release_notes.txt
 
 See LICENSE file for software license, and the end of this file for credits.
 
+
+===============================================================================
+PR#6 2018-10-xx
+
+Update and reformat TODO file.
+
+Add basic interface to the hosting C program.
+
 ===============================================================================
 PR#5 2018-10-08
 
-Add LICENSE file, update README
+Added LICENSE file, and updated README, converting to Markdown format.
 
 ===============================================================================
 PR#4 2018-10-08
