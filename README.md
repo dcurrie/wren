@@ -11,7 +11,7 @@ Wren's RAM requirement is under 4 KB, and it supports up to 64 KB.
 
 2. make
 
-3. ./check-examples
+3. ./test/check-examples
 
 5. ./build
    (This makes a stripped executable optimized for size.)
@@ -42,6 +42,8 @@ Have fun!
 Todd's NOTES explain the Wren Grammar and some interpreter features.
 
 See LICENSE file for software license, and the end of release_notes.txt for credits.
+
+The test/check-examples assumes 64-bit values.
 
 Some of the examples, such as boot.wren and disasm.wren are written
 assuming a little-endian machine. This should be fixed soon.

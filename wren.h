@@ -44,6 +44,10 @@ typedef intptr_t wValue;
 */
 #define PRVAL "ld"
 
+/** Type of the unsigned version of a Wren-language value.
+*/
+typedef uintptr_t wUvalu; 
+
 #if (INTPTR_MAX == INT64_MAX)
 #define SIZEOF_WVALUE (8)
 #else

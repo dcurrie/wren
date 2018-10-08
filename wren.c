@@ -547,7 +547,7 @@ static wValue run (Instruc *pc, const Instruc *end)
             case RETURN:
                 {
                     wValue result = sp[0];
-                    unsigned short *f = (unsigned short *)(sp + 1);
+                    uint16_t *f = (uint16_t *)(sp + 1);
                     sp = bp;
                     bp = (wValue *)(the_store + f[0]);
                     pc = the_store + f[1];
@@ -571,14 +571,14 @@ static wValue run (Instruc *pc, const Instruc *end)
             case MUL:  sp[1] *= sp[0]; ++sp; break;
             case DIV:  sp[1] /= sp[0]; ++sp; break;
             case MOD:  sp[1] %= sp[0]; ++sp; break;
-            case UMUL: sp[1] = (unsigned)sp[1] * (unsigned)sp[0]; ++sp; break;
-            case UDIV: sp[1] = (unsigned)sp[1] / (unsigned)sp[0]; ++sp; break;
-            case UMOD: sp[1] = (unsigned)sp[1] % (unsigned)sp[0]; ++sp; break;
+            case UMUL: sp[1] = (wUvalu )sp[1] * (wUvalu )sp[0]; ++sp; break;
+            case UDIV: sp[1] = (wUvalu )sp[1] / (wUvalu )sp[0]; ++sp; break;
+            case UMOD: sp[1] = (wUvalu )sp[1] % (wUvalu )sp[0]; ++sp; break;
             case NEGATE: sp[0] = -sp[0]; break;
 
             case EQ:   sp[1] = sp[1] == sp[0]; ++sp; break;
             case LT:   sp[1] = sp[1] < sp[0];  ++sp; break;
-            case ULT:  sp[1] = (unsigned)sp[1] < (unsigned)sp[0]; ++sp; break;
+            case ULT:  sp[1] = (wUvalu )sp[1] < (wUvalu )sp[0]; ++sp; break;
 
             case AND:  sp[1] &= sp[0]; ++sp; break;
             case OR:   sp[1] |= sp[0]; ++sp; break;
@@ -586,7 +586,7 @@ static wValue run (Instruc *pc, const Instruc *end)
 
             case SLA:  sp[1] <<= sp[0]; ++sp; break;
             case SRA:  sp[1] >>= sp[0]; ++sp; break;
-            case SRL:  sp[1] = (unsigned)sp[1] >> (unsigned)sp[0]; ++sp; break;
+            case SRL:  sp[1] = (wUvalu )sp[1] >> (wUvalu )sp[0]; ++sp; break;
 
             case GETC:
                    need(1);
@@ -690,7 +690,7 @@ static void gen_value (wValue v)
 static Instruc *forward_ref (void)
 {
     Instruc *ref = compiler_ptr;
-    compiler_ptr += sizeof(unsigned short);
+    compiler_ptr += sizeof(uint16_t);
     return ref;
 }
 

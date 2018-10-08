@@ -10,6 +10,12 @@ Update and reformat TODO file.
 
 Add basic interface to the hosting C program.
 
+Add command line args to main(), including file loading.
+
+Fix bug in unsigned arithmetic and tests.
+
+Moved examples file and test code to new test directory.
+
 ===============================================================================
 PR#5 2018-10-08
 
