@@ -4,13 +4,13 @@ See LICENSE file for software license, and the end of this file for credits.
 
 
 ===============================================================================
-PR#6 2018-10-xx
+PR#6 2018-10-08
 
 Update and reformat TODO file.
 
 Add basic interface to the hosting C program.
 
-Add command line args to main(), including file loading.
+Add command line args to main(), including file loading option.
 
 Fix bug in unsigned arithmetic and tests.
 

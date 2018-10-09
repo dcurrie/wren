@@ -48,6 +48,8 @@ typedef intptr_t wValue;
 */
 typedef uintptr_t wUvalu; 
 
+/** Size of a Wren-language value; needed for preprocessor so sizeof() not sufficient.
+*/
 #if (INTPTR_MAX == INT64_MAX)
 #define SIZEOF_WVALUE (8)
 #else
@@ -63,7 +65,7 @@ typedef uintptr_t wUvalu;
 
 /* ################### API ################### */
 
-typedef wValue (*apply_t)();
+typedef wValue (*apply_t)(); // the type of C functions for CCALL and wren_bind_c_function()
 
 void wren_initialize (void);
 
