@@ -1,0 +1,4 @@
+./wren <test/examples >test/examples.out 2>test/examples.err &&
+diff -u test/examples.expected test/examples.out &&
+diff -u test/examples.expectederr test/examples.err
+

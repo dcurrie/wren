@@ -10,7 +10,6 @@
 
 #include <assert.h>
 #include <ctype.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -344,7 +343,6 @@ static void dump_dictionary (void)
 
 /* Call to C functions; see bind_c_function and CCALL prim */
 
-typedef wValue (*apply_t)();
 static long ccall(apply_t fn, wValue *args, unsigned arity)
 {
   switch (arity)
@@ -549,7 +547,7 @@ static wValue run (Instruc *pc, const Instruc *end)
             case RETURN:
                 {
                     wValue result = sp[0];
-                    unsigned short *f = (unsigned short *)(sp + 1);
+                    uint16_t *f = (uint16_t *)(sp + 1);
                     sp = bp;
                     bp = (wValue *)(the_store + f[0]);
                     pc = the_store + f[1];
@@ -573,14 +571,14 @@ static wValue run (Instruc *pc, const Instruc *end)
             case MUL:  sp[1] *= sp[0]; ++sp; break;
             case DIV:  sp[1] /= sp[0]; ++sp; break;
             case MOD:  sp[1] %= sp[0]; ++sp; break;
-            case UMUL: sp[1] = (unsigned)sp[1] * (unsigned)sp[0]; ++sp; break;
-            case UDIV: sp[1] = (unsigned)sp[1] / (unsigned)sp[0]; ++sp; break;
-            case UMOD: sp[1] = (unsigned)sp[1] % (unsigned)sp[0]; ++sp; break;
+            case UMUL: sp[1] = (wUvalu )sp[1] * (wUvalu )sp[0]; ++sp; break;
+            case UDIV: sp[1] = (wUvalu )sp[1] / (wUvalu )sp[0]; ++sp; break;
+            case UMOD: sp[1] = (wUvalu )sp[1] % (wUvalu )sp[0]; ++sp; break;
             case NEGATE: sp[0] = -sp[0]; break;
 
             case EQ:   sp[1] = sp[1] == sp[0]; ++sp; break;
             case LT:   sp[1] = sp[1] < sp[0];  ++sp; break;
-            case ULT:  sp[1] = (unsigned)sp[1] < (unsigned)sp[0]; ++sp; break;
+            case ULT:  sp[1] = (wUvalu )sp[1] < (wUvalu )sp[0]; ++sp; break;
 
             case AND:  sp[1] &= sp[0]; ++sp; break;
             case OR:   sp[1] |= sp[0]; ++sp; break;
@@ -588,7 +586,7 @@ static wValue run (Instruc *pc, const Instruc *end)
 
             case SLA:  sp[1] <<= sp[0]; ++sp; break;
             case SRA:  sp[1] >>= sp[0]; ++sp; break;
-            case SRL:  sp[1] = (unsigned)sp[1] >> (unsigned)sp[0]; ++sp; break;
+            case SRL:  sp[1] = (wUvalu )sp[1] >> (wUvalu )sp[0]; ++sp; break;
 
             case GETC:
                    need(1);
@@ -692,7 +690,7 @@ static void gen_value (wValue v)
 static Instruc *forward_ref (void)
 {
     Instruc *ref = compiler_ptr;
-    compiler_ptr += sizeof(unsigned short);
+    compiler_ptr += sizeof(uint16_t);
     return ref;
 }
 
@@ -713,13 +711,14 @@ static void block_prev (void)
 enum { unread = EOF - 1 };
 static int input_char = unread;
 static int token;
+static FILE *in_file;
 static wValue token_value;
-static char token_name[16];
+static char token_name[17]; // 16 + NUL
 
 static int ch (void)
 {
     if (input_char == unread)
-        input_char = getc(stdin);
+        input_char = getc(in_file);
     return input_char;
 }
 
@@ -1135,11 +1134,11 @@ static wValue scratch_expr (void)
     }
 }
 
-static void run_expr (void)
+static void run_expr (FILE *outp)
 {
     wValue v = scratch_expr();
-    if (!complaint)
-        printf("%"PRVAL"\n", v);
+    if (!complaint && NULL != outp)
+        fprintf(outp, "%"PRVAL"\n", v);
 }
 
 static void run_let (void)
@@ -1226,7 +1225,7 @@ static void run_fun (void)
     }
 }
 
-static void run_command (void)
+static void run_command (FILE *outp)
 {
 
     skip_newline();
@@ -1246,18 +1245,47 @@ static void run_command (void)
         run_forget();
     }
     else
-        run_expr();
+        run_expr(outp);
 
     if (complaint)
     {
-        printf("%s\n", complaint);
+        fprintf(stderr, "%s\n", complaint);
         skip_line();  /* i.e., flush any buffered input, sort of */
         next();
     }
 }
 
-/* The top level */
-static void read_eval_print_loop (void)
+/**
+* @brief wren_load_file -- loads a file into wren interpreter
+* ; similar to wren_read_eval_print_loop but without the prompts or print of expression results
+*/
+void wren_load_file (FILE *fp)
+{
+    FILE *saved_in_file = in_file;
+
+    in_file = fp; // set the input source
+
+    // just like wren_read_eval_print_loop but no prompts or printing results
+    //
+    next_char();
+    complaint = NULL;
+    next();
+    while (token != EOF)
+    {
+        run_command(NULL);
+        skip_newline();
+        complaint = NULL;
+    }
+
+    input_char = unread;
+    in_file = saved_in_file; // restore the input source
+}
+
+/**
+* @brief wren_read_eval_print_loop - The top level
+* ; does not return until stdin runs out of characters!
+*/
+void wren_read_eval_print_loop (void)
 {
     printf("> ");
     next_char();
@@ -1265,13 +1293,15 @@ static void read_eval_print_loop (void)
     next();
     while (token != EOF)
     {
-        run_command();
+        run_command(stdout);
         printf("> ");
         skip_newline();
         complaint = NULL;
     }
     printf("\n");
 }
+
+// Test CCALL C functions
 
 static wValue tstfn2 (wValue a1, wValue a2)
 {
@@ -1285,14 +1315,25 @@ static wValue tstfn0 (void)
     return 13;
 }
 
-static void bind_c_function (const char *name, apply_t fn, const unsigned arity)
+/**
+* @brief wren_bind_c_function - create binding for C function callable by wren code
+* 
+* @param[in] name  - new wren function name
+* @param[in] fn    - the C function of type apply_t
+* @param[in] arity - number of arguments to the C funciton (must be < 8)
+*/
+void wren_bind_c_function (const char *name, apply_t fn, const uint8_t arity)
 {
     (void )bind(name, strlen(name), a_cfunction, compiler_ptr - the_store);
     gen_ubyte(arity);
     gen_value((wValue )fn);
 }
 
-int main ()
+/**
+* @brief wren_initialize - create initial dictionary
+* ; must be called before any other wren_functions
+*/
+void wren_initialize (void)
 {
     ((wValue *)the_store)[2] = (wValue )the_store;
     ((wValue *)the_store)[3] = (wValue )store_end;
@@ -1301,13 +1342,48 @@ int main ()
     bind("dp", 2, a_global, 1 * sizeof(wValue));
     bind("c0", 2, a_global, 2 * sizeof(wValue));
     bind("d0", 2, a_global, 3 * sizeof(wValue));
-
     compiler_ptr = the_store + (4 * sizeof(wValue));
+    in_file = stdin;
+}
 
-    bind_c_function("tstfn2", tstfn2, 2);
-    bind_c_function("tstfn0", tstfn0, 0);
+#if WREN_STANDALONE
 
-    read_eval_print_loop();
+int main (int argc, char **argv)
+{
+    int i = 1;
+    int skip_repl = 0;
+
+    wren_initialize();
+
+    wren_bind_c_function("tstfn2", tstfn2, 2);
+    wren_bind_c_function("tstfn0", tstfn0, 0);
+
+    while (i < argc)
+    {
+        if (strcmp(argv[i], "-f") == 0)
+        {
+            skip_repl = 1;
+        }
+        else
+        {
+            FILE *fp = fopen(argv[i], "r");
+            if (NULL != fp)
+            {
+                wren_load_file(fp);
+                fclose(fp);
+            }
+            else
+            {
+                //printf("Cannot open %s for reading, error: %d\n", argv[i], errno);
+                printf("Cannot open arg %d %s for reading\n", i, argv[i]);
+            }
+        }
+        i += 1;
+    }
+
+    if (!skip_repl) wren_read_eval_print_loop();
+
     return 0;
 }
 
+#endif

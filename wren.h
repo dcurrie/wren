@@ -14,9 +14,9 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stdio.h>
 
 /* ############## Configuration ############## */
-
 
 /** @def WREN_UNALIGNED_ACCESS_OK
 * @brief non-zero enables reads and writes of multi-byte values from/to unaligned addresses.
@@ -26,6 +26,17 @@ extern "C" {
 #define WREN_UNALIGNED_ACCESS_OK (0)
 #endif
 
+/** @def WREN_STANDALONE
+* @brief non-zero enables main() with command line config and read-eval-print loop.
+* Default to standalone; set to 0 if you want to use Wren as a library.
+*/
+#ifndef WREN_STANDALONE
+#define WREN_STANDALONE (1)
+#endif
+
+
+/* ################## Types ################## */
+
 /** Type of a Wren-language value. Must be capable of holding a pointer or an integer
 */
 typedef intptr_t wValue;
@@ -33,6 +44,12 @@ typedef intptr_t wValue;
 */
 #define PRVAL "ld"
 
+/** Type of the unsigned version of a Wren-language value.
+*/
+typedef uintptr_t wUvalu; 
+
+/** Size of a Wren-language value; needed for preprocessor so sizeof() not sufficient.
+*/
 #if (INTPTR_MAX == INT64_MAX)
 #define SIZEOF_WVALUE (8)
 #else
@@ -48,7 +65,15 @@ typedef intptr_t wValue;
 
 /* ################### API ################### */
 
-// TODO: init, bind_c_function, read_eval_print_loop
+typedef wValue (*apply_t)(); // the type of C functions for CCALL and wren_bind_c_function()
+
+void wren_initialize (void);
+
+void wren_bind_c_function (const char *name, apply_t fn, const uint8_t arity);
+
+void wren_load_file (FILE *fp);
+
+void wren_read_eval_print_loop (void);
 
 #ifdef __cplusplus
 }

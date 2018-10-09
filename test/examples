@@ -34,7 +34,8 @@ fun putd n =            # Print a signed decimal.
     putud (abs n)
 putd 2007; cr
 putd (-1); cr
-putd (sla 1 31); cr
+#putd (sla 1 31); cr # this assumes 32 bit values to produce -2147483648
+putd (sla 1 63); cr # this assumes 64 bit values to produce -9223372036854775808
 
 fun putx u =            # Print an unsigned hex number.
   if ult 15 u then putx (srl u 4) else 0;
