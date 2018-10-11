@@ -29,9 +29,9 @@ enum {
 
 #if WREN_UNALIGNED_ACCESS_OK
 
-static inline uint16_t fetch_2u (const uint8_t *p)
+static inline wIndex fetch_wX (const uint8_t *p)
 {
-    return *(uint16_t *)p;
+    return *(wIndex *)p;
 }
 
 static inline int16_t fetch_2i (const uint8_t *p)
@@ -44,19 +44,29 @@ static inline wValue fetch_wV (const uint8_t *p)
     return *(wValue *)p;
 }
 
+static inline apply_t fetch_wP (const uint8_t *p)
+{
+    return *(apply_t *)p;
+}
+
 static inline void write_2i (uint8_t *p, const int16_t v)
 {
     *(int16_t *)p = v;
 }
 
-static inline void write_2u (uint8_t *p, const uint16_t v)
+static inline void write_wX (uint8_t *p, const wIndex v)
 {
-    *(uint16_t *)p = v;
+    *(wIndex *)p = v;
 }
 
 static inline void write_wV (uint8_t *p, const wValue v)
 {
     *(wValue *)p = v;
+}
+
+static inline void write_wP (uint8_t *p, const apply_t v)
+{
+    *(apply_t *)p = v;
 }
 
 #else
@@ -68,10 +78,10 @@ static inline void write_wV (uint8_t *p, const wValue v)
 // the union, this code uses no Undefined Behavior as long as the data are 
 // written and read with the matching pair write_XX and fetch_XX.
 
-static inline uint16_t fetch_2u (const uint8_t *p)
+static inline wIndex fetch_wX (const uint8_t *p)
 {
-    union { uint16_t v; uint8_t b[sizeof(uint16_t)]; } u;
-    memcpy(u.b, p, sizeof(uint16_t));
+    union { wIndex v; uint8_t b[sizeof(wIndex)]; } u;
+    memcpy(u.b, p, sizeof(wIndex));
     return u.v;
 }
 
@@ -84,16 +94,23 @@ static inline int16_t fetch_2i (const uint8_t *p)
 
 static inline wValue fetch_wV (const uint8_t *p)
 {
-    union { wValue v; uint8_t b[SIZEOF_WVALUE]; } u;
-    memcpy(u.b, p, SIZEOF_WVALUE);
+    union { wValue v; uint8_t b[sizeof(wValue)]; } u;
+    memcpy(u.b, p, sizeof(wValue));
     return u.v;
 }
 
-static inline void write_2u (uint8_t *p, const uint16_t v)
+static inline apply_t fetch_wP (const uint8_t *p)
 {
-    union { uint16_t v; uint8_t b[sizeof(uint16_t)]; } u;
+    union { apply_t v; uint8_t b[sizeof(apply_t)]; } u;
+    memcpy(u.b, p, sizeof(apply_t));
+    return u.v;
+}
+
+static inline void write_wX (uint8_t *p, const wIndex v)
+{
+    union { wIndex v; uint8_t b[sizeof(wIndex)]; } u;
     u.v = v;
-    memcpy(p, u.b, sizeof(uint16_t));
+    memcpy(p, u.b, sizeof(wIndex));
 }
 
 static inline void write_2i (uint8_t *p, const int16_t v)
@@ -105,9 +122,16 @@ static inline void write_2i (uint8_t *p, const int16_t v)
 
 static inline void write_wV (uint8_t *p, const wValue v)
 {
-    union { wValue v; uint8_t b[SIZEOF_WVALUE]; } u;
+    union { wValue v; uint8_t b[sizeof(wValue)]; } u;
     u.v = v;
-    memcpy(p, u.b, SIZEOF_WVALUE);
+    memcpy(p, u.b, sizeof(wValue));
+}
+
+static inline void write_wP (uint8_t *p, const apply_t v)
+{
+    union { apply_t v; uint8_t b[sizeof(apply_t)]; } u;
+    u.v = v;
+    memcpy(p, u.b, sizeof(apply_t));
 }
 
 #endif
@@ -149,7 +173,7 @@ static uint8_t the_store[store_capacity];
 typedef enum { a_primitive, a_procedure, a_global, a_local, a_cfunction } NameKind;
 typedef struct Header Header;
 struct Header {
-    uint16_t binding;   // or for primintives, uint8_t arity; uint8_t opcode
+    wIndex   binding;   // or for primintives, uint8_t arity; uint8_t opcode
     uint8_t  kind_lnm1; // (kind << 4) | (name_length - 1)
     uint8_t  name[0];
 } __attribute__((packed));  /* XXX gcc dependency */
@@ -168,9 +192,9 @@ static inline uint8_t get_header_name_length (const uint8_t *p_header)
     return ((((Header *)p_header)->kind_lnm1) & 0xfu) + 1u;
 }
 
-static inline uint16_t get_header_binding (const uint8_t *p_header)
+static inline wIndex get_header_binding (const uint8_t *p_header)
 {
-    return fetch_2u(p_header);
+    return fetch_wX(p_header);
 }
 
 static inline uint8_t get_header_prim_arity (const uint8_t *p_header)
@@ -190,24 +214,24 @@ static inline void set_header_kind_lnm1 (uint8_t *p_header, NameKind kind, int n
     ((Header *)p_header)->kind_lnm1 = (k << 4) | (z & 0xfu);
 }
 
-static inline void set_header_binding (uint8_t *p_header, const uint16_t binding)
+static inline void set_header_binding (uint8_t *p_header, const wIndex binding)
 {
-    write_2u(p_header, binding);
+    write_wX(p_header, binding);
 }
 
-/* We make compiler_ptr accessible as a global variable to Wren code;
-   it's located in the first wValue cell of the_store. (See
-   primitive_dictionary, below.) This requires that
-   sizeof (uint8_t *) == sizeof (wValue). Sorry!
-   (If you change wValue to a short type, then change compiler_ptr to a
-   short offset from the_store instead of a pointer type.
-   */
-#define compiler_ptr   (((uint8_t **)the_store)[0])
-#define dictionary_ptr (((uint8_t **)the_store)[1])
+/* We make code_idx and dict_idx accessible as a global variable to Wren code, located in
+*  the first two wValue cells of the_store. (See "cp" and "dp" setup in wren_initialize().)
+*/
+
+#define code_idx (((wUvalu *)the_store)[0])
+#define dict_idx (((wUvalu *)the_store)[1])
+
+#define code_ptr (&the_store[code_idx])
+#define dict_ptr (&the_store[dict_idx])
 
 static int available (unsigned amount)
 {
-    if (compiler_ptr + amount <= dictionary_ptr)
+    if (code_idx + amount <= dict_idx)
         return 1;
     complain("Store exhausted");
     return 0;
@@ -228,11 +252,11 @@ static Header *bind (const char *name, unsigned length, NameKind kind, unsigned 
     
     if (available(sizeof(Header) + length))
     {
-        dictionary_ptr -= sizeof(Header) + length;
+        dict_idx -= sizeof(Header) + length;
         {
-            Header *h = (Header *)dictionary_ptr;
+            Header *h = (Header *)dict_ptr;
             set_header_kind_lnm1((uint8_t *)h, kind, (uint8_t )length);
-            set_header_binding((uint8_t *)h, (uint16_t )binding);
+            set_header_binding((uint8_t *)h, (wIndex )binding);
             memcpy(h->name, name, length);
             return h;
         }
@@ -252,7 +276,7 @@ static const Header *lookup (const uint8_t *dict, const uint8_t *end,
     return NULL;
 }
 
-static inline uint8_t get_proc_arity (uint16_t binding)
+static inline uint8_t get_proc_arity (wIndex binding)
 {
     // Procedures are compiled with the first byte holding the procedure's arity
     return the_store[binding];
@@ -283,34 +307,24 @@ static void dump (const uint8_t *dict, const uint8_t *end)
 typedef uint8_t Instruc;
 
 enum {
-    HALT,
-    PUSH, POP, PUSH_STRING,
-    GLOBAL_FETCH, GLOBAL_STORE, LOCAL_FETCH,
-    TCALL, CALL, RETURN,
-    BRANCH, JUMP,
-    ADD, SUB, MUL, DIV, MOD, UMUL, UDIV, UMOD, NEGATE,
-    EQ, LT, ULT,
-    AND, OR, XOR, SLA, SRA, SRL,
-    GETC, PUTC,
-    FETCH_BYTE, PEEK, POKE,
-    LOCAL_FETCH_0, LOCAL_FETCH_1, PUSHW, PUSHB,
-    CCALL, 
+    /*   0 */ HALT, PUSH, POP, PUSH_STRING, GLOBAL_FETCH, GLOBAL_STORE, LOCAL_FETCH,
+    /*   7 */ TCALL, CALL, RETURN, BRANCH, JUMP,
+    /*  12 */ ADD, SUB, MUL, DIV, MOD, UMUL, UDIV, UMOD, NEGATE,
+    /*  21 */ EQ, LT, ULT, AND, OR, XOR, SLA, SRA, SRL,
+    /*  30 */ GETC, PUTC, REFB, REFV, SETV,
+    /*  35 */ LOCAL_FETCH_0, LOCAL_FETCH_1, PUSHW, PUSHB,
+    /*  39 */ CCALL, REFX, SETX, SETB,
 };
 
 #ifndef NDEBUG
 static const char *opcode_names[] = {
-    "HALT",
-    "PUSH", "POP", "PUSH_STRING",
-    "GLOBAL_FETCH", "GLOBAL_STORE", "LOCAL_FETCH",
-    "TCALL", "CALL", "RETURN",
-    "BRANCH", "JUMP",
+    "HALT", "PUSH", "POP", "PUSH_STRING", "GLOBAL_FETCH", "GLOBAL_STORE", "LOCAL_FETCH",
+    "TCALL", "CALL", "RETURN", "BRANCH", "JUMP",
     "ADD", "SUB", "MUL", "DIV", "MOD", "UMUL", "UDIV", "UMOD", "NEGATE",
-    "EQ", "LT", "ULT",
-    "AND", "OR", "XOR", "SLA", "SRA", "SRL",
-    "GETC", "PUTC",
-    "FETCH_BYTE", "PEEK", "POKE",
+    "EQ", "LT", "ULT", "AND", "OR", "XOR", "SLA", "SRA", "SRL",
+    "GETC", "PUTC", "REFB", "REFV", "SETV",
     "LOCAL_FETCH_0", "LOCAL_FETCH_1", "PUSHW", "PUSHB",
-    "CCALL", 
+    "CCALL", "REFX", "SETX", "SETB",
 };
 #endif
 
@@ -325,8 +339,11 @@ static const uint8_t primitive_dictionary[] =
     PRIM_HEADER(SRL,  2, 3), 's', 'r', 'l',
     PRIM_HEADER(GETC, 0, 4), 'g', 'e', 't', 'c',
     PRIM_HEADER(PUTC, 1, 4), 'p', 'u', 't', 'c',
-    PRIM_HEADER(PEEK, 1, 4), 'p', 'e', 'e', 'k',
-    PRIM_HEADER(POKE, 2, 4), 'p', 'o', 'k', 'e',
+    PRIM_HEADER(REFV, 1, 4), 'r', 'e', 'f', 'v',
+    PRIM_HEADER(SETV, 2, 4), 's', 'e', 't', 'v',
+    PRIM_HEADER(REFX, 1, 4), 'r', 'e', 'f', 'x',
+    PRIM_HEADER(SETX, 2, 4), 's', 'e', 't', 'x',
+    PRIM_HEADER(SETB, 2, 4), 's', 'e', 't', 'b',
 };
 
 #ifndef NDEBUG
@@ -334,7 +351,7 @@ static const uint8_t primitive_dictionary[] =
 static void dump_dictionary (void)
 {
     printf("dictionary:\n");
-    dump(dictionary_ptr, store_end);
+    dump(dict_ptr, store_end);
     dump(primitive_dictionary,
             primitive_dictionary + sizeof primitive_dictionary);
 }
@@ -374,13 +391,13 @@ static long ccall(apply_t fn, wValue *args, unsigned arity)
 #undef A7
 
 /* Run VM code starting at 'pc', with the stack allocated the space between
-   'end' and dictionary_ptr. Return the result on top of the stack. */
+   'end' and dict_ptr. Return the result on top of the stack. */
 static wValue run (Instruc *pc, const Instruc *end)
 {
     /* Stack pointer and base pointer 
        Initially just above the first free aligned wValue cell below
        the dictionary. */
-    wValue *sp = (wValue *)(((uintptr_t )dictionary_ptr) & ~(sizeof(wValue) - 1));
+    wValue *sp = (wValue *)(((uintptr_t )dict_ptr) & ~(sizeof(wValue) - 1));
     wValue *bp = sp;
 
 #define need(n) \
@@ -390,7 +407,7 @@ static wValue run (Instruc *pc, const Instruc *end)
     {
 #ifndef NDEBUG
         if (loud)
-            printf("RUN: %"PRVAL"\t%s\n", pc - the_store, opcode_names[*pc]);
+            printf("RUN: %"PRVAL"\t%s\n", (wValue )(pc - the_store), opcode_names[*pc]);
 #endif
 
         switch (*pc++)
@@ -420,20 +437,20 @@ static wValue run (Instruc *pc, const Instruc *end)
 
             case PUSH_STRING:
                 need(1);
-                *--sp = (wValue)pc;
+                *--sp = (wValue)(pc - the_store);
                 /* N.B. this op is slower the longer the string is! */
                 pc += strlen((const char *)pc) + 1;
                 break;
 
             case GLOBAL_FETCH:
                 need(1);
-                *--sp = fetch_wV(the_store + fetch_2u(pc));
-                pc += sizeof(uint16_t);
+                *--sp = fetch_wV(the_store + fetch_wX(pc));
+                pc += sizeof(wIndex);
                 break;
 
             case GLOBAL_STORE:
-                write_wV(the_store + fetch_2u(pc), sp[0]);
-                pc += sizeof(uint16_t);
+                write_wV(the_store + fetch_wX(pc), sp[0]);
+                pc += sizeof(wIndex);
                 break;
 
             case LOCAL_FETCH_0:
@@ -470,9 +487,9 @@ static wValue run (Instruc *pc, const Instruc *end)
                    */ 
             case TCALL: /* Known tail call. */
                 {
-                    uint16_t binding = fetch_2u(pc);
+                    wIndex binding = fetch_wX(pc);
                     uint8_t n = get_proc_arity(binding);
-                    /* XXX portability: this assumes two unsigned shorts fit in a wValue */
+                    /* XXX portability: this assumes two wIndex fit in a wValue */
                     wValue frame_info = sp[n];
                     memmove((bp+1-n), sp, n * sizeof(wValue));
                     sp = bp - n;
@@ -494,11 +511,11 @@ static wValue run (Instruc *pc, const Instruc *end)
                        (Maybe that expense would be worth incurring, though, for the
                        sake of smaller compiled code.)
                        */
-                    const Instruc *cont = pc + sizeof(uint16_t);
+                    const Instruc *cont = pc + sizeof(wIndex);
                     while (*cont == JUMP)
                     {
                         ++cont;
-                        cont += fetch_2u(cont);
+                        cont += fetch_wX(cont);
                     }
                     if (*cont == RETURN)
                     {
@@ -507,15 +524,15 @@ static wValue run (Instruc *pc, const Instruc *end)
                     }
                     else
                     {
-                        uint16_t binding = fetch_2u(pc);
+                        wIndex binding = fetch_wX(pc);
                         uint8_t n = get_proc_arity(binding);
                         /* This is a non-tail call. Build a new frame. */ 
                         need(1);
                         --sp;
                         {
-                            /* XXX portability: this assumes two uint16_t fit in a wValue
+                            /* XXX portability: this assumes two wIndex fit in a wValue
                             ** and they the alignment is natural for both values; seems ok */
-                            uint16_t *f = (uint16_t *)sp;
+                            wIndex *f = (wIndex *)sp;
                             f[0] = (uint8_t *)bp - the_store;
                             f[1] = cont - the_store;
                             bp = sp + n;
@@ -527,9 +544,9 @@ static wValue run (Instruc *pc, const Instruc *end)
 
             case CCALL:
                 {
-                    uint16_t binding = fetch_2u(pc);
+                    wIndex binding = fetch_wX(pc);
                     uint8_t n = get_proc_arity(binding);
-                    wValue result = ccall((apply_t )fetch_wV(the_store + binding + 1u), sp, n);
+                    wValue result = ccall((apply_t )fetch_wP(the_store + binding + 1u), sp, n);
                     if (n == 0u)
                     {
                         need(1);
@@ -540,14 +557,14 @@ static wValue run (Instruc *pc, const Instruc *end)
                         sp += n - 1;
                     }
                     sp[0] = result;
-                    pc += sizeof(uint16_t);
+                    pc += sizeof(wIndex);
                 }
                 break;
 
             case RETURN:
                 {
                     wValue result = sp[0];
-                    uint16_t *f = (uint16_t *)(sp + 1);
+                    wIndex *f = (wIndex *)(sp + 1);
                     sp = bp;
                     bp = (wValue *)(the_store + f[0]);
                     pc = the_store + f[1];
@@ -557,13 +574,13 @@ static wValue run (Instruc *pc, const Instruc *end)
 
             case BRANCH:
                 if (0 == *sp++)
-                    pc += fetch_2u(pc);
+                    pc += fetch_wX(pc);
                 else
-                    pc += sizeof(uint16_t);
+                    pc += sizeof(wIndex);
                 break;
 
             case JUMP:
-                pc += fetch_2u(pc);
+                pc += fetch_wX(pc);
                 break;
 
             case ADD:  sp[1] += sp[0]; ++sp; break;
@@ -589,27 +606,98 @@ static wValue run (Instruc *pc, const Instruc *end)
             case SRL:  sp[1] = (wUvalu )sp[1] >> (wUvalu )sp[0]; ++sp; break;
 
             case GETC:
-                   need(1);
-                   *--sp = getc(stdin);
-                   break;
+                need(1);
+                *--sp = getc(stdin);
+                break;
 
             case PUTC:
-                   putc(sp[0], stdout);
-                   break;
+                putc(sp[0], stdout);
+                break;
 
-            case FETCH_BYTE:
-                   /* XXX boundschecking */
-                   sp[0] = *(uint8_t *)(sp[0]);
-                   break;
-
-            case PEEK:
-                   sp[0] = fetch_wV((uint8_t *)sp[0]);
-                   break;
-
-            case POKE:
-                   write_wV((uint8_t *)sp[1], sp[0]);
-                   ++sp;                    // e: just one value popped
-                   break;
+            case REFB:
+            {
+                wUvalu x = (wUvalu )sp[0]; // unsigned for comparison
+                if (x < (wUvalu )store_capacity)
+                {
+                    sp[0] = the_store[x];
+                }
+                else
+                {
+                    // Out of Bounds --  XXX ignore!?
+                    sp[0] = 0;
+                }
+                break;
+            }
+            case REFV:
+            {
+                wUvalu x = (wUvalu )sp[0]; // unsigned for comparison
+                if (x <= (wUvalu )(store_capacity - sizeof(wValue)))
+                {
+                    sp[0] = fetch_wV(&the_store[x]);
+                }
+                else
+                {
+                    // Out of Bounds --  XXX ignore!?
+                    sp[0] = 0;
+                }
+                break;
+            }
+            case SETV:
+            {
+                wUvalu x = (wUvalu )sp[1]; // unsigned for comparison
+                if (x <= (wUvalu )(store_capacity - sizeof(wValue)))
+                {
+                    write_wV(&the_store[x], sp[0]);
+                }
+                else
+                {
+                    // Out of Bounds --  XXX ignore!?
+                }
+                ++sp;                    // e: just one value popped
+                break;
+            }
+            case REFX:
+            {
+                wUvalu x = (wUvalu )sp[0]; // unsigned for comparison
+                if (x <= (wUvalu )(store_capacity - sizeof(wIndex)))
+                {
+                    sp[0] = (wValue )fetch_wX(&the_store[x]);
+                }
+                else
+                {
+                    // Out of Bounds --  XXX ignore!?
+                    sp[0] = 0;
+                }
+                break;
+            }
+            case SETX:
+            {
+                wUvalu x = (wUvalu )sp[1]; // unsigned for comparison
+                if (x <= (wUvalu )(store_capacity - sizeof(wIndex)))
+                {
+                    write_wX(&the_store[x], (wIndex )sp[0]);
+                }
+                else
+                {
+                    // Out of Bounds --  XXX ignore!?
+                }
+                ++sp;                    // e: just one value popped
+                break;
+            }
+            case SETB:
+            {
+                wUvalu x = (wUvalu )sp[1]; // unsigned for comparison
+                if (x < (wUvalu )store_capacity)
+                {
+                    the_store[x] = (uint8_t )sp[0];
+                }
+                else
+                {
+                    // Out of Bounds --  XXX ignore!?
+                }
+                ++sp;                    // e: just one value popped
+                break;
+            }
 
             default: assert(0);
         }
@@ -623,87 +711,98 @@ stack_overflow:
 
 /* The 'assembler' */
 
-static Instruc *prev_instruc = NULL;
+static wIndex prev_instruc = 0u;
 
 static void gen (Instruc opcode)
 {
 #ifndef NDEBUG
     if (loud)
-        printf("ASM: %"PRVAL"\t%s\n", compiler_ptr - the_store, opcode_names[opcode]);
+        printf("ASM: %"PRVAL"\t%s\n", code_idx, opcode_names[opcode]);
 #endif
     if (available(1))
     {
-        prev_instruc = compiler_ptr;
-        *compiler_ptr++ = opcode;
+        prev_instruc = code_idx;
+        the_store[code_idx++] = opcode;
     }
 }
 
 static void gen_ubyte (uint8_t b)
 {
     if (loud)
-        printf("ASM: %"PRVAL"\tubyte %u\n", compiler_ptr - the_store, b);
+        printf("ASM: %"PRVAL"\tubyte %u\n", code_idx, b);
     if (available(1))
-        *compiler_ptr++ = b;
+        the_store[code_idx++] = b;
 }
 
 static void gen_sbyte (int8_t b)
 {
     if (loud)
-        printf("ASM: %"PRVAL"\tsbyte %d\n", compiler_ptr - the_store, b);
+        printf("ASM: %"PRVAL"\tsbyte %d\n", code_idx, b);
     if (available(1))
-        *(int8_t *)compiler_ptr++ = b;
+        ((int8_t *)the_store)[code_idx++] = b;
 }
 
-static void gen_ushort (uint16_t u)
+static void gen_ushort (wIndex u)
 {
     if (loud)
-        printf("ASM: %"PRVAL"\tushort %u\n", compiler_ptr - the_store, u);
+        printf("ASM: %"PRVAL"\tushort %u\n", code_idx, u);
     if (available(sizeof u))
     {
-        write_2u(compiler_ptr, u);
-        compiler_ptr += sizeof u;
+        write_wX(code_ptr, u);
+        code_idx += sizeof u;
     }
 }
 
 static void gen_sshort (int16_t u)
 {
     if (loud)
-        printf("ASM: %"PRVAL"\tsshort %d\n", compiler_ptr - the_store, u);
+        printf("ASM: %"PRVAL"\tsshort %d\n", code_idx, u);
     if (available(sizeof u))
     {
-        write_2i(compiler_ptr, u);
-        compiler_ptr += sizeof u;
+        write_2i(code_ptr, u);
+        code_idx += sizeof u;
     }
 }
 
 static void gen_value (wValue v)
 {
     if (loud)
-        printf("ASM: %"PRVAL"\tvalue %"PRVAL"\n", compiler_ptr - the_store, v);
+        printf("ASM: %"PRVAL"\tvalue %"PRVAL"\n", code_idx, v);
     if (available(sizeof v))
     {
-        write_wV(compiler_ptr, v);
-        compiler_ptr += sizeof v;
+        write_wV(code_ptr, v);
+        code_idx += sizeof v;
     }
 }
 
-static Instruc *forward_ref (void)
+static void gen_pointer (apply_t v)
 {
-    Instruc *ref = compiler_ptr;
-    compiler_ptr += sizeof(uint16_t);
+    if (loud)
+        printf("ASM: %"PRVAL"\tvalue %"PRPTR"\n", code_idx, v);
+    if (available(sizeof v))
+    {
+        write_wP(code_ptr, v);
+        code_idx += sizeof v;
+    }
+}
+
+static wIndex forward_ref (void)
+{
+    wIndex ref = code_idx;
+    code_idx += sizeof(wIndex);
     return ref;
 }
 
-static void resolve (Instruc *ref)
+static void resolve (wIndex ref)
 {
     if (loud)
-        printf("ASM: %"PRVAL"\tresolved: %"PRVAL"\n", ref - the_store, compiler_ptr - ref);
-    write_2u(ref, compiler_ptr - ref);
+        printf("ASM: %"PRIDX"\tresolved: %"PRVAL"\n", ref, code_idx - ref);
+    write_wX(&the_store[ref], code_idx - ref);
 }
 
 static void block_prev (void)
 {
-    prev_instruc = NULL;    // The previous instruction isn't really known
+    prev_instruc = 0u;    // The previous instruction isn't really known
 }
 
 /* Scanning */
@@ -813,8 +912,8 @@ again:
                     /* We need to stick this string somewhere; after reaching
                        the parser, if successfully parsed, it would be compiled
                        into the instruction stream right after the next opcode.
-                       So just put it there -- but don't yet update compiler_ptr. */
-                    uint8_t *s = compiler_ptr + 1;
+                       So just put it there -- but don't yet update code_idx. */
+                    uint8_t *s = code_ptr + 1;
                     for (; ch() != '\''; next_char())
                     {
                         if (ch() == EOF)
@@ -823,7 +922,7 @@ again:
                             token = EOF;
                             return;
                         }
-                        if (!available(s + 2 - compiler_ptr))
+                        if (!available(s + 2 - code_ptr))
                         {
                             token = '\n';  /* XXX need more for error recovery? */
                             return;
@@ -920,14 +1019,13 @@ static void parse_factor (void)
 
         case '\'':                  /* string constant */
             gen(PUSH_STRING);
-            compiler_ptr += strlen((const char *)compiler_ptr) + 1;
+            code_idx += strlen((const char *)code_ptr) + 1;
             next();
             break;
 
         case 'a':                   /* identifier */
             {
-                const Header *h = lookup(dictionary_ptr, store_end,
-                                         token_name, strlen(token_name));
+                const Header *h = lookup(dict_ptr, store_end, token_name, strlen(token_name));
                 if (!h)
                     h = lookup(primitive_dictionary, 
                                 primitive_dictionary + sizeof primitive_dictionary,
@@ -957,7 +1055,7 @@ static void parse_factor (void)
 
                         case a_procedure:
                             {
-                                uint16_t binding = get_header_binding((uint8_t *)h);
+                                wIndex binding = get_header_binding((uint8_t *)h);
                                 parse_arguments(get_proc_arity(binding));
                                 gen(CALL);
                                 gen_ushort(binding);
@@ -966,7 +1064,7 @@ static void parse_factor (void)
 
                         case a_cfunction:
                             {
-                                uint16_t binding = get_header_binding((uint8_t *)h);
+                                wIndex binding = get_header_binding((uint8_t *)h);
                                 parse_arguments(get_proc_arity(binding));
                                 gen(CCALL);
                                 gen_ushort(binding);
@@ -990,7 +1088,7 @@ static void parse_factor (void)
 
         case 'i':                   /* if-then-else */
             {
-                Instruc *branch, *jump;
+                wIndex branch, jump;
                 next();
                 parse_expr(0);
                 gen(BRANCH);
@@ -1018,7 +1116,7 @@ static void parse_factor (void)
         case '*':                   /* character fetch */
             next();
             parse_factor();
-            gen(FETCH_BYTE);
+            gen(REFB);
             break;
 
         case '-':                   /* unary minus */
@@ -1027,12 +1125,12 @@ static void parse_factor (void)
 
             // If previous instruction is a value, then just negate it.
             if (prev_instruc) {
-                if (*prev_instruc == PUSH)
-                    ((wValue *)compiler_ptr)[-1] *= -1;
-                else if (*prev_instruc == PUSHB)
-                    ((signed char *)compiler_ptr)[-1] *= -1;
-                else if (*prev_instruc == PUSHW)
-                    ((short *)compiler_ptr)[-1] *= -1;
+                if (the_store[prev_instruc] == PUSH)
+                    write_wV(code_ptr - sizeof(wValue), -fetch_wV(code_ptr - sizeof(wValue)));
+                else if (the_store[prev_instruc] == PUSHW)
+                    write_2i(code_ptr - sizeof(int16_t), -fetch_2i(code_ptr - sizeof(int16_t)));
+                else if (the_store[prev_instruc] == PUSHB)
+                    ((signed char *)code_ptr)[-1] *= -1;
                 else
                     gen(NEGATE);
             } else
@@ -1094,10 +1192,10 @@ static void parse_expr (int precedence)
             gen(rator);
         else if (rator == GLOBAL_STORE)
         {
-            if (prev_instruc && *prev_instruc == GLOBAL_FETCH)
+            if (prev_instruc && the_store[prev_instruc] == GLOBAL_FETCH)
             {
-                uint16_t addr = fetch_2u(prev_instruc + 1);
-                compiler_ptr = prev_instruc;
+                wIndex addr = fetch_wX(&the_store[prev_instruc + 1]);
+                code_idx = prev_instruc;
                 parse_expr(l);
                 gen(GLOBAL_STORE);
                 gen_ushort(addr);
@@ -1123,13 +1221,13 @@ static void parse_done (void)
 
 static wValue scratch_expr (void)
 {
-    Instruc *start = compiler_ptr;
+    Instruc *start = code_ptr;
     parse_expr(-1);
     parse_done();
     gen(HALT);
     {
-        Instruc *end = compiler_ptr;
-        compiler_ptr = start;
+        Instruc *end = code_ptr;
+        code_idx = start - the_store;
         return complaint ? 0 : run(start, end);
     }
 }
@@ -1145,7 +1243,7 @@ static void run_let (void)
 {
     if (expect('a', "Expected identifier") && available(sizeof(wValue)))
     {
-        uint8_t *cell = compiler_ptr;
+        uint8_t *cell = code_ptr;
         gen_value(0);
         bind(token_name, strlen(token_name), a_global, cell - the_store);
         next();
@@ -1161,8 +1259,7 @@ static void run_forget (void)
 {
     if (expect('a', "Expected identifier"))
     {
-        const Header *h = lookup(dictionary_ptr, store_end,
-                token_name, strlen(token_name));
+        const Header *h = lookup(dict_ptr, store_end, token_name, strlen(token_name));
         if (!h)
             complain("Unknown identifier");
         else
@@ -1176,12 +1273,11 @@ static void run_forget (void)
         if (!complaint)
         {
             uint8_t *cp = the_store + h->binding;
-            uint8_t *dp = 
-                (uint8_t *) next_header((const uint8_t *) h);
-            if (the_store <= cp && cp <= dp && dp <= store_end)
+            uint8_t *dp = (uint8_t *)next_header((const uint8_t *)h);
+            if (the_store < cp && cp <= dp && dp <= store_end)
             {
-                compiler_ptr = cp;
-                dictionary_ptr = dp;
+                code_idx = cp - the_store;
+                dict_idx = dp - the_store;
             }
             else
                 complain("Dictionary corrupted");
@@ -1193,14 +1289,14 @@ static void run_fun (void)
 {
     if (expect('a', "Expected identifier"))
     {
-        uint8_t *dp = dictionary_ptr;
-        uint8_t *cp = compiler_ptr;
-        Header *f = bind(token_name, strlen(token_name), a_procedure, compiler_ptr - the_store);
+        wIndex di = dict_idx;
+        wIndex ci = code_idx;
+        Header *f = bind(token_name, strlen(token_name), a_procedure, code_idx);
         uint8_t arity = 0u;
         next();
         if (f)
         {
-            uint8_t *dp = dictionary_ptr;
+            wIndex di = dict_idx;
             while (token == 'a')
             {
                 /* XXX check for too many parameters */
@@ -1210,17 +1306,17 @@ static void run_fun (void)
             if (expect('=', "Expected '='"))
             {
                 next();
-                gen(arity);     // first "opcode" of function is arity
+                gen_ubyte(arity);     // first "opcode" of function is arity
                 parse_expr(-1);
                 parse_done();
                 gen(RETURN);
             }
-            dictionary_ptr = dp;  /* forget parameter names */
+            dict_idx = di;  /* forget parameter names */
         }
         if (complaint)
         {
-            dictionary_ptr = dp;  /* forget function and code. */
-            compiler_ptr = cp;
+            dict_idx = di;  /* forget function and code. */
+            code_idx = ci;
         }
     }
 }
@@ -1324,9 +1420,9 @@ static wValue tstfn0 (void)
 */
 void wren_bind_c_function (const char *name, apply_t fn, const uint8_t arity)
 {
-    (void )bind(name, strlen(name), a_cfunction, compiler_ptr - the_store);
+    (void )bind(name, strlen(name), a_cfunction, code_idx);
     gen_ubyte(arity);
-    gen_value((wValue )fn);
+    gen_pointer(fn);
 }
 
 /**
@@ -1335,14 +1431,14 @@ void wren_bind_c_function (const char *name, apply_t fn, const uint8_t arity)
 */
 void wren_initialize (void)
 {
-    ((wValue *)the_store)[2] = (wValue )the_store;
-    ((wValue *)the_store)[3] = (wValue )store_end;
-    dictionary_ptr = store_end;
+    ((wValue *)the_store)[2] = 0u;                      // TODO: scrap this
+    ((wValue *)the_store)[3] = (wValue )store_capacity;
+    dict_idx = (wValue )store_capacity;
     bind("cp", 2, a_global, 0 * sizeof(wValue));
     bind("dp", 2, a_global, 1 * sizeof(wValue));
     bind("c0", 2, a_global, 2 * sizeof(wValue));
     bind("d0", 2, a_global, 3 * sizeof(wValue));
-    compiler_ptr = the_store + (4 * sizeof(wValue));
+    code_idx = 4 * sizeof(wValue);
     in_file = stdin;
 }
 

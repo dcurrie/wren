@@ -4,6 +4,23 @@ See LICENSE file for software license, and the end of this file for credits.
 
 
 ===============================================================================
+PR#7 2018-10-xx
+
+Sandboxing progress...
+
+Convert to using indexes into the_store rather than addresses for user code.
+Reduce size of wValue from 64 to 32 bits now that it needn't hold pointers.
+
+Add primitives refx setx to read and write wIndex values (endian neutral).
+Add primitives refv setv (formerly peek and poke) to read and write wValues.
+Add primitives      setb to write byte values, complementing the * operator.
+Range check indexes (within the_store) for the six peek and poke prims.
+
+Use the above new primitives in .wren files (boot.wren, disasm.wren) to make 
+them endian neutral and range checked.
+Update disassembler(disasm.wren) for new primitives.
+
+===============================================================================
 PR#6 2018-10-08
 
 Update and reformat TODO file.

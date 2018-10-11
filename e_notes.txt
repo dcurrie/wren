@@ -1,28 +1,48 @@
 
 Bugs:
 
-disasm.wren and boot.wren assumes little endian; maybe we need peek2
+X disasm.wren and boot.wren assumes little endian; maybe we need peek2 (refx)
 
-boot.wren could use * (i.e., peek_byte) in place of peek in a couple places
+X boot.wren could use * (i.e., fetch_byte) in place of peek in a couple places
 
-Try to eliminate get_xt (it adds c0 and isn't really necessary)
+  Try to eliminate (or rename) get_xt (it adds c0 and isn't really necessary)
 
-Look at uses of c0; see Sandboxing below
+  Look at uses of c0; see Sandboxing below
 
-TBD
+  Convert "cp" to "cx" and "dp" to "dx"?
+
+X Rename FETCH_BYTE PEEK POKE to REFB REFV SETV and add REFX SETX SETB
+X where B is Byte X is indeX and V is Value
+X all take wIndex offsets into the_store.
+X PEEKB *
+X PEEKX refx
+X PEEKV refv
+X POKEB setb
+X POKEX setx
+X POKEV setv
 
 Sandboxing:
 
-Consider converting from addresses to offsets everywhere inside the_store
- -- the exception would be CCALL addresses
- -- pay attention to PUSH_STRING which pushes an address now
+X Consider converting from addresses to offsets everywhere inside the_store
+X  -- the exception would be CCALL addresses
+X  -- pay attention to PUSH_STRING which pushes an address now
 
-Alternatively, check all peek and poke operations to be within the_store;
-what other operations would need this check?
+X Convert wValue to int32_t
+X  -- requires gen_pointer and write_wP to make wren_bind_c_function work
+X  -- requires                 fetch_wP to make CCALL work
 
-Replace assert() with something that longjmps to reset the world
+X Check all peek and poke operations to be within the_store;
+
+What other operations would need a bounds check?
+
+Replace assert() with something that longjmps to reset wren
 
 Extending:
+
+disasm.wren could try to find names for GLOBAL_FETCH and GLOBAL_STORE
+(BTW, consider renaming to SETG and REFG for compatibility with REF/SET prims?)
+
+Consider encoding string length after PUSH_STRING to avoid strlen()
 
 To add function locals (e.g., "let xxx : yyy in ...") we'd need an additional field
 for the number of locals; it would be used along with arity to allocate and drop 
@@ -32,11 +52,47 @@ arguments on the stack.
 Now that we've moved the arity to the first byte of the function body in code space,
 the locals counts can go in that same byte.
 
+Provide array syntax; bounds checking would work for all of 
+the_store if the first word of the store was the store size. I.e., 0[index] = ...
+The Forth CREATE word makes a new dict word that simply returns its code pointer. 
+We could do the same for ARRAY, and store the size in the first couple bytes.
+Otherwise we need a prim to return a value (and index) size to compute offsets.
+Do we also need an align prim to optimize access time?
+
 
 Readline support, e.g., https://github.com/Helius/microrl/network
 (but microrl wants to prompt after every newline; need to be smarter)
 
 ===========================================================================
+
+2018-10-09
+
+Cut:
+
+# Assumes wValues are 4 bytes (not true on LP64); assumes little endian
+#fun byte_mask n = not (sla 0xff (n*8))
+#fun byte_or orig byte new = orig & (byte_mask byte) | (sla (new & 0xff) (byte*8))
+#fun aligned addr = addr & (not 0x03)
+#fun offset addr = addr & 0x03
+#
+#fun cpoke addr x = 
+#   poke (aligned addr) (byte_or (peek (aligned addr)) (offset addr) x)
+
+# This isn't reliable. Probably need to hard wire this anyways
+## Dangerous stuff here, don't play unless you understand!
+#fun execute xt =
+#   poke (find 'exec_helper') 0x09090909 ;
+#   poke (find 'exec_helper'-1) (0x08 + sla (xt-c0) 16)
+#
+## Don't ever, ever call this!
+#fun exec_helper = cr;cr
+## End dangerous stuff
+
+# Use execute on xt's of no argument functions.
+# Example:
+# fun test = puts 'Hello World';cr
+# You can run test by executing it's xt.
+# execute (find 'test')
 
 
 2018-10-07

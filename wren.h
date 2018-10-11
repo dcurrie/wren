@@ -34,10 +34,11 @@ extern "C" {
 #define WREN_STANDALONE (1)
 #endif
 
-
 /* ################## Types ################## */
 
-/** Type of a Wren-language value. Must be capable of holding a pointer or an integer
+#if 0
+
+/** Type of a Wren-language value.
 */
 typedef intptr_t wValue;
 /* and how to printf it
@@ -48,24 +49,37 @@ typedef intptr_t wValue;
 */
 typedef uintptr_t wUvalu; 
 
-/** Size of a Wren-language value; needed for preprocessor so sizeof() not sufficient.
+#else
+
+/** Type of a Wren-language value.
 */
-#if (INTPTR_MAX == INT64_MAX)
-#define SIZEOF_WVALUE (8)
-#else
-#if (INTPTR_MAX == INT32_MAX)
-#define SIZEOF_WVALUE (4)
-#else
-#error "Cannot determine wValue size."
-#endif
+typedef int32_t wValue;
+/* and how to printf it
+*/
+#define PRVAL "d"
+
+/** Type of the unsigned version of a Wren-language value.
+*/
+typedef uint32_t wUvalu; 
+
 #endif
 
-// TODO: wIndex
+/** Type of a Wren-language index into the_store. Must be half the size of wValue or smaller.
+*/
+typedef uint16_t wIndex;
+/* and how to printf it
+*/
+#define PRIDX "u"
 
+/** Type of a Wren-language pointer to C function.
+*/
+typedef wValue (*apply_t)(); // the type of C functions for CCALL and wren_bind_c_function()
+/* and how to printf it
+*/
+#define PRPTR "p"
 
 /* ################### API ################### */
 
-typedef wValue (*apply_t)(); // the type of C functions for CCALL and wren_bind_c_function()
 
 void wren_initialize (void);
 
