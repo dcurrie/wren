@@ -223,8 +223,8 @@ static inline void set_header_binding (uint8_t *p_header, const wIndex binding)
 *  the first two wValue cells of the_store. (See "cp" and "dp" setup in wren_initialize().)
 */
 
-#define code_idx (((wValue *)the_store)[0])
-#define dict_idx (((wValue *)the_store)[1])
+#define code_idx (((wUvalu *)the_store)[0])
+#define dict_idx (((wUvalu *)the_store)[1])
 
 #define code_ptr (&the_store[code_idx])
 #define dict_ptr (&the_store[dict_idx])
@@ -407,7 +407,7 @@ static wValue run (Instruc *pc, const Instruc *end)
     {
 #ifndef NDEBUG
         if (loud)
-            printf("RUN: %"PRVAL"\t%s\n", pc - the_store, opcode_names[*pc]);
+            printf("RUN: %"PRVAL"\t%s\n", (wValue )(pc - the_store), opcode_names[*pc]);
 #endif
 
         switch (*pc++)

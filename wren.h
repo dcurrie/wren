@@ -36,7 +36,9 @@ extern "C" {
 
 /* ################## Types ################## */
 
-/** Type of a Wren-language value. Must be capable of holding a pointer or an integer
+#if 0
+
+/** Type of a Wren-language value.
 */
 typedef intptr_t wValue;
 /* and how to printf it
@@ -46,6 +48,21 @@ typedef intptr_t wValue;
 /** Type of the unsigned version of a Wren-language value.
 */
 typedef uintptr_t wUvalu; 
+
+#else
+
+/** Type of a Wren-language value.
+*/
+typedef int32_t wValue;
+/* and how to printf it
+*/
+#define PRVAL "d"
+
+/** Type of the unsigned version of a Wren-language value.
+*/
+typedef uint32_t wUvalu; 
+
+#endif
 
 /** Type of a Wren-language index into the_store. Must be half the size of wValue or smaller.
 */
