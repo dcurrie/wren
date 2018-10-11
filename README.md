@@ -28,7 +28,8 @@ Wren's RAM requirement is under 4 KB, and it supports up to 64 KB.
 
 One thing that's probably not obvious is that you can define arrays
 or other dynamic data structures in a Wren program. The thing is, you
-have to use peek and poke. But you can allocate the space for it so
+have to use peek (refb, refx, refv) and poke (setb, setx, setv). 
+But you can allocate the space for it so
 the interpreter doesn't step all over it, by incrementing the 'cp'
 variable (short for compiler_ptr, its name at the C level). Same 
 basic idea as ALLOT in Forth: get the current value of cp as the 

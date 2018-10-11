@@ -1,7 +1,7 @@
 
 Bugs:
 
-  disasm.wren and boot.wren assumes little endian; maybe we need peek2 (refx)
+X disasm.wren and boot.wren assumes little endian; maybe we need peek2 (refx)
 
 X boot.wren could use * (i.e., fetch_byte) in place of peek in a couple places
 
@@ -9,26 +9,17 @@ X boot.wren could use * (i.e., fetch_byte) in place of peek in a couple places
 
   Look at uses of c0; see Sandboxing below
 
-  Rename FETCH_BYTE PEEK POKE to REFB REFV SETV and add REFX SETX SETB
-  where B is Byte X is indeX and V is Value
-  all take wIndex offsets into the_store.
-  PEEKB *
-  PEEKX refx
-  PEEKV refv
-  POKEB setb
-  POKEX setx
-  POKEV setv
+  Convert "cp" to "cx" and "dp" to "dx"?
 
-  Or scrap peek/poke and provide array syntax; bounds checking would work for all of 
-  the_store if the first word of the store was the store size. I.e., 0[index] = ...
-
-  The Forth CREATE word makes a new dict word that simply returns its code pointer. 
-  We could do the same for ARRAY, and store the size in the first couple bytes.
-
-  Otherwise we need a prim to return a value (and index) size to compute offsets.
-  Do we also need an align prim to optimize access time?
-
-TBD
+X Rename FETCH_BYTE PEEK POKE to REFB REFV SETV and add REFX SETX SETB
+X where B is Byte X is indeX and V is Value
+X all take wIndex offsets into the_store.
+X PEEKB *
+X PEEKX refx
+X PEEKV refv
+X POKEB setb
+X POKEX setx
+X POKEV setv
 
 Sandboxing:
 
@@ -40,12 +31,15 @@ X  -- pay attention to PUSH_STRING which pushes an address now
 X  -- requires gen_pointer and write_wP to make wren_bind_c_function work
 X  -- requires                 fetch_wP to make CCALL work
 
-Check all peek and poke operations to be within the_store;
-what other operations would need this check?
+X Check all peek and poke operations to be within the_store;
 
-Replace assert() with something that longjmps to reset the world
+What other operations would need a bounds check?
+
+Replace assert() with something that longjmps to reset wren
 
 Extending:
+
+Consider encoding string length after PUSH_STRING to avoid strlen()
 
 To add function locals (e.g., "let xxx : yyy in ...") we'd need an additional field
 for the number of locals; it would be used along with arity to allocate and drop 
@@ -54,6 +48,13 @@ arguments on the stack.
 
 Now that we've moved the arity to the first byte of the function body in code space,
 the locals counts can go in that same byte.
+
+Provide array syntax; bounds checking would work for all of 
+the_store if the first word of the store was the store size. I.e., 0[index] = ...
+The Forth CREATE word makes a new dict word that simply returns its code pointer. 
+We could do the same for ARRAY, and store the size in the first couple bytes.
+Otherwise we need a prim to return a value (and index) size to compute offsets.
+Do we also need an align prim to optimize access time?
 
 
 Readline support, e.g., https://github.com/Helius/microrl/network

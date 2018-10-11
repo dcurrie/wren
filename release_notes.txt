@@ -8,11 +8,13 @@ PR#7 2018-10-xx
 
 Sandboxing progress...
 
-Convert the use of addresses as values to instead use indexes into the_store.
+Convert using addresses as values to instead use indexes into the_store.
 
-TODO: range check indexes (x < (unsigned )store_capacity)
-
-TODO: refx refv setb setx setv
+Add primitives refx setx to read and write wIndex values (endian neutral).
+Add primitives refv setv (formerly peek and poke) to read and write wValues (endian neutral).
+Add primitives      setb to write byte values, complementing the * operator.
+Use the above new primitives in .wren files (boot, disasm); update disassembler.
+Range check indexes (x < (unsigned )store_capacity) for the six peek and poke prims.
 
 TODO: reduce size of wValue from 64 to 32 bits now that it needed hold pointers
 

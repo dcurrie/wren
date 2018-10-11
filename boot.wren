@@ -123,11 +123,9 @@ fun find_help str addr =
     else
         0
 
-# Note that everything that uses peek in this code is assuming little endian
-
 fun get_xt addr = 
     if (addr = 0) then 0
-    else (0xffff & peek addr) + c0
+    else (refx addr) + c0
 
 # Returns xt of found string, or 0 otherwise
 fun find str = get_xt (find_help str dp)

@@ -54,7 +54,7 @@ typedef uint16_t wIndex;
 */
 #define PRIDX "u"
 
-/** Type of a Wren-language pointer to C function. Must be half the size of wValue or smaller.
+/** Type of a Wren-language pointer to C function.
 */
 typedef wValue (*apply_t)(); // the type of C functions for CCALL and wren_bind_c_function()
 /* and how to printf it

@@ -9,17 +9,17 @@ fun dis_string =
     if *(dis_pc-1) = 0 then 0
     else (putc *(dis_pc-1) ; dis_string)
 
-# dis_value assumes little endian!
+# dis_value assumes wValue is 4 bytes
 #
 fun dis_value bytes =
-    if bytes = 0 then 0
-    else (
-        dis_pc : (dis_pc + 1);
-        *(dis_pc - 1) + 256 * dis_value (bytes-1))
+    if      bytes = 1 then (dis_pc : (dis_pc + 1);    * (dis_pc - 1))
+    else if bytes = 2 then (dis_pc : (dis_pc + 2); refx (dis_pc - 2))
+    else if bytes = 4 then (dis_pc : (dis_pc + 4); refv (dis_pc - 4))
+    else 0
 
 fun dis_fun_lookup addr hdr =
     if hdr < d0 then (
-        if addr = (0xffff & peek hdr) then
+        if addr = (refx hdr) then
             put_name hdr
         else
             dis_fun_lookup addr (next_hdr hdr))
@@ -28,11 +28,9 @@ fun dis_fun_lookup addr hdr =
 
 fun dis_call_arity addr = *(c0 + addr)
 
-# dis_call assumes little endian!
-#
 fun dis_call =
-    puts 'TO: '; dis_fun_lookup (0xffff & peek dis_pc) dp;
-    puts ' ARGS: '; putd (dis_call_arity (0xffff & peek dis_pc)); dis_pc : dis_pc + 2
+    puts 'TO: '; dis_fun_lookup (refx dis_pc) dp;
+    puts ' ARGS: '; putd (dis_call_arity (refx dis_pc)); dis_pc : dis_pc + 2
 
 fun dis_op val =
     dis_pc : (dis_pc+1);
@@ -47,6 +45,7 @@ fun dis_op val =
     else if val = 0x06 then (puts 'LOCAL_FETCH '  ; putd (dis_value 1))
     else if val = 0x07 then (puts 'TCALL '        ; dis_call)
     else if val = 0x08 then (puts 'CALL '         ; dis_call)
+    else if val = 0x27 then (puts 'CCALL '        ; dis_call)
     else if val = 0x09 then (puts 'RETURN'        ; dis_pc : 0)
     else if val = 0x0a then (puts 'BRANCH '       ; putd (dis_value 2))
     else if val = 0x0b then (puts 'JUMP '         ; putd (dis_value 2))
@@ -70,15 +69,16 @@ fun dis_op val =
     else if val = 0x1d then  puts 'SRL'
     else if val = 0x1e then  puts 'GETC'
     else if val = 0x1f then  puts 'PUTC' 
-    else if val = 0x20 then  puts 'FETCH_BYTE' 
-    else if val = 0x21 then  puts 'PEEK'
-    else if val = 0x22 then  puts 'POKE'
+    else if val = 0x20 then  puts 'REFB' 
+    else if val = 0x21 then  puts 'REFV'
+    else if val = 0x22 then  puts 'SETV'
     else if val = 0x23 then  puts 'LOCAL_FETCH_0'
     else if val = 0x24 then  puts 'LOCAL_FETCH_1'
-    else if val = 0x27 then (puts 'CCALL '        ; dis_call)
+    else if val = 0x28 then  puts 'REFX'
+    else if val = 0x29 then  puts 'SETX'
+    else if val = 0x2a then  puts 'SETX'
     else (puts 'UNKNOWN: 0x' ; putx val; dis_pc : 0)
 
-        
 
 fun dis_help =
     if dis_pc = 0 then cr
