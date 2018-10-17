@@ -6,6 +6,11 @@ See LICENSE file for software license, and the end of this file for credits.
 ===============================================================================
 PR#8 2018-10-xx
 
+Sandboxing progress...
+
+TODO test this...
+Replace assert() with code that longjmps to (a) cancel loading file, (b) cancel
+read-eval-print-loop, or (c) cancel eval
 
 Rename get_xt to find-ref and eliminate use of c0 there.
 Eliminate c0 since it's always zero.

@@ -4,9 +4,9 @@ Bugs:
 
 Sandboxing:
 
-What other operations would need a bounds check?
+Need to test jmpbuf code.
 
-Replace assert() with something that longjmps to reset wren
+What other operations would need a bounds check?
 
 Make poke operations optional? (setb setx setv) (See array syntax below.)
 

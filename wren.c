@@ -8,7 +8,7 @@
 * @note See LICENSE file for licensing terms.
 */
 
-#include <assert.h>
+#include <setjmp.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +24,38 @@ enum {
     /* True iff voluminous tracing is wanted. */
     loud = 0,
 };
+
+/* Assertions */
+
+#ifdef NDEBUG
+
+#define RUN_ASSERT(expr) ((void)0)
+#define CPL_ASSERT(expr) ((void)0)
+
+#else
+
+static jmp_buf cpl_buf__; /* jump buf for compile time exceptions */
+static jmp_buf run_buf__; /* jump buf for run time exceptions */
+
+static void run_assert_(const int line, const char *funnm, const char *filnm, const char *expr)
+{
+    fprintf(stderr, "At %s:%d:%s, assertion `%s` failed\n", filnm, line, funnm, expr);
+    longjmp(run_buf__, 1);
+}
+
+#define RUN_ASSERT(expr) \
+    ((expr) ? (void)0 : run_assert_(__LINE__, __func__, __FILE__, #expr))
+
+static void cpl_assert_(const int line, const char *funnm, const char *filnm, const char *expr)
+{
+    fprintf(stderr, "At %s:%d:%s, assertion `%s` failed\n", filnm, line, funnm, expr);
+    longjmp(cpl_buf__, 1);
+}
+
+#define CPL_ASSERT(expr) \
+    ((expr) ? (void)0 : cpl_assert_(__LINE__, __func__, __FILE__, #expr))
+
+#endif
 
 /* Accessors for unaligned storage in dictionary and code spaces */
 
@@ -245,10 +277,10 @@ static const uint8_t *next_header (const uint8_t *header)
 
 static Header *bind (const char *name, unsigned length, NameKind kind, unsigned binding)
 {
-    assert(name);
-    assert((length - 1u) < (1u << 4));
-    assert(kind <= a_cfunction);
-    assert(binding <= UINT16_MAX);
+    CPL_ASSERT(name);
+    CPL_ASSERT((length - 1u) < (1u << 4));
+    CPL_ASSERT(kind <= a_cfunction);
+    CPL_ASSERT(binding <= UINT16_MAX);
     
     if (available(sizeof(Header) + length))
     {
@@ -699,7 +731,7 @@ static wValue run (Instruc *pc, const Instruc *end)
                 break;
             }
 
-            default: assert(0);
+            default: RUN_ASSERT(0);
         }
     }
 
@@ -1080,7 +1112,7 @@ static void parse_factor (void)
                             break;
 
                         default:
-                            assert(0);
+                            CPL_ASSERT(0);
                     }
                 }
             }
@@ -1221,15 +1253,22 @@ static void parse_done (void)
 
 static wValue scratch_expr (void)
 {
+    wValue result = 0;
     Instruc *start = code_ptr;
+    Instruc *end;
     parse_expr(-1);
     parse_done();
     gen(HALT);
+    end = code_ptr;
+    code_idx = start - the_store; // restore code index
+
+#ifndef NDEBUG
+    if (!setjmp(run_buf__)) // execute the next block once; asserts are caught and return 0
+#endif
     {
-        Instruc *end = code_ptr;
-        code_idx = start - the_store;
-        return complaint ? 0 : run(start, end);
+        result = complaint ? 0 : run(start, end);
     }
+    return result;
 }
 
 static void run_expr (FILE *outp)
@@ -1361,18 +1400,22 @@ void wren_load_file (FILE *fp)
 
     in_file = fp; // set the input source
 
-    // just like wren_read_eval_print_loop but no prompts or printing results
-    //
-    next_char();
-    complaint = NULL;
-    next();
-    while (token != EOF)
+#ifndef NDEBUG
+    if (!setjmp(cpl_buf__)) // execute the next block once; asserts are caught and return
+#endif
     {
-        run_command(NULL);
-        skip_newline();
+        // just like wren_read_eval_print_loop but no prompts or printing results
+        //
+        next_char();
         complaint = NULL;
+        next();
+        while (token != EOF)
+        {
+            run_command(NULL);
+            skip_newline();
+            complaint = NULL;
+        }
     }
-
     input_char = unread;
     in_file = saved_in_file; // restore the input source
 }
@@ -1383,18 +1426,23 @@ void wren_load_file (FILE *fp)
 */
 void wren_read_eval_print_loop (void)
 {
-    printf("> ");
-    next_char();
-    complaint = NULL;
-    next();
-    while (token != EOF)
+#ifndef NDEBUG
+    if (!setjmp(cpl_buf__)) // execute the next block once; asserts are caught and return
+#endif
     {
-        run_command(stdout);
         printf("> ");
-        skip_newline();
+        next_char();
         complaint = NULL;
+        next();
+        while (token != EOF)
+        {
+            run_command(stdout);
+            printf("> ");
+            skip_newline();
+            complaint = NULL;
+        }
+        printf("\n");
     }
-    printf("\n");
 }
 
 // Test CCALL C functions
@@ -1420,9 +1468,14 @@ static wValue tstfn0 (void)
 */
 void wren_bind_c_function (const char *name, apply_t fn, const uint8_t arity)
 {
-    (void )bind(name, strlen(name), a_cfunction, code_idx);
-    gen_ubyte(arity);
-    gen_pointer(fn);
+#ifndef NDEBUG
+    if (!setjmp(cpl_buf__)) // execute the next block once; asserts are caught and return
+#endif
+    {
+        (void )bind(name, strlen(name), a_cfunction, code_idx);
+        gen_ubyte(arity);
+        gen_pointer(fn);
+    }
 }
 
 /**
@@ -1431,13 +1484,21 @@ void wren_bind_c_function (const char *name, apply_t fn, const uint8_t arity)
 */
 void wren_initialize (void)
 {
-    ((wValue *)the_store)[2] = (wValue )store_capacity;
-    dict_idx = (wValue )store_capacity;
-    bind("cp", 2, a_global, 0 * sizeof(wValue));
-    bind("dp", 2, a_global, 1 * sizeof(wValue));
-    bind("dz", 2, a_global, 2 * sizeof(wValue));
-    code_idx = 3 * sizeof(wValue);
-    in_file = stdin;
+#ifndef NDEBUG
+    if (!setjmp(cpl_buf__)) // execute the next block once; asserts are caught and return
+#endif
+    {
+        ((wValue *)the_store)[2] = (wValue )store_capacity;
+        dict_idx = (wValue )store_capacity;
+        bind("cp", 2, a_global, 0 * sizeof(wValue));
+        bind("dp", 2, a_global, 1 * sizeof(wValue));
+        bind("dz", 2, a_global, 2 * sizeof(wValue));
+        code_idx = 3 * sizeof(wValue);
+        in_file = stdin;
+    }
+#ifndef NDEBUG
+    // TODO -- what?
+#endif
 }
 
 #if WREN_STANDALONE
