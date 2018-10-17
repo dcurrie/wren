@@ -1031,7 +1031,7 @@ static void parse_factor (void)
                                 primitive_dictionary + sizeof primitive_dictionary,
                                 token_name, strlen(token_name));
                 if (!h)
-                    complain("Unknown identifier");
+                    complain("Unknown identifier"); // XXX: add token name to output
                 else
                 {
                     next();
@@ -1261,7 +1261,7 @@ static void run_forget (void)
     {
         const Header *h = lookup(dict_ptr, store_end, token_name, strlen(token_name));
         if (!h)
-            complain("Unknown identifier");
+            complain("Unknown identifier"); // XXX: add token name to output
         else
         {
             NameKind k = get_header_kind((uint8_t *)h);
@@ -1431,14 +1431,12 @@ void wren_bind_c_function (const char *name, apply_t fn, const uint8_t arity)
 */
 void wren_initialize (void)
 {
-    ((wValue *)the_store)[2] = 0u;                      // TODO: scrap this
-    ((wValue *)the_store)[3] = (wValue )store_capacity;
+    ((wValue *)the_store)[2] = (wValue )store_capacity;
     dict_idx = (wValue )store_capacity;
     bind("cp", 2, a_global, 0 * sizeof(wValue));
     bind("dp", 2, a_global, 1 * sizeof(wValue));
-    bind("c0", 2, a_global, 2 * sizeof(wValue));
-    bind("d0", 2, a_global, 3 * sizeof(wValue));
-    code_idx = 4 * sizeof(wValue);
+    bind("dz", 2, a_global, 2 * sizeof(wValue));
+    code_idx = 3 * sizeof(wValue);
     in_file = stdin;
 }
 

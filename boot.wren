@@ -90,14 +90,14 @@ fun next_hdr addr =
     addr + hdr_str_len addr + 3
 
 fun words_help addr =
-    if addr < d0 then (
+    if addr < dz then (
         putcs (hdr_str_len addr) (addr+3);
         putc 32;
         words_help (next_hdr addr))
     else cr
 
 fun words = words_help dp
-fun perc_remaining = 100*(dp-cp)/(d0-c0)
+fun perc_remaining = 100*(dp-cp)/dz
     
 # 1 if equal, 0 if not
 fun streq s1 s2 = 
@@ -115,7 +115,7 @@ fun streq_n n s1 s2 =
     else 0
 
 fun find_help str addr = 
-    if addr < d0 then
+    if addr < dz then
         if (streq_n (hdr_str_len addr) (hdr_str addr) str) then
             addr
         else
@@ -123,12 +123,12 @@ fun find_help str addr =
     else
         0
 
-fun get_xt addr = 
+fun find_ref addr = 
     if (addr = 0) then 0
-    else (refx addr) + c0
+    else refx addr
 
-# Returns xt of found string, or 0 otherwise
-fun find str = get_xt (find_help str dp)
+# Returns index of found string, or 0 otherwise
+fun find str = find_ref (find_help str dp)
 
 fun not x = -(x+1)
 

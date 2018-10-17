@@ -44,7 +44,7 @@ Todd's NOTES explain the Wren Grammar and some interpreter features.
 
 See LICENSE file for software license, and the end of release_notes.txt for credits.
 
-The test/check-examples assumes 64-bit values.
+The test/check-examples assumes 32-bit values.
 
-Some of the examples, such as boot.wren and disasm.wren are written
-assuming a little-endian machine. This should be fixed soon.
+Some of the smaple code, such as boot.wren and disasm.wren are written
+assuming 32-bit values, which is the default configuration.

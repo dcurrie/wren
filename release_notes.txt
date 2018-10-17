@@ -4,7 +4,19 @@ See LICENSE file for software license, and the end of this file for credits.
 
 
 ===============================================================================
-PR#7 2018-10-xx
+PR#8 2018-10-xx
+
+
+Rename get_xt to find-ref and eliminate use of c0 there.
+Eliminate c0 since it's always zero.
+Rename d0 to dz (dict siZe, or dict Zero).
+
+Print globals' names in disassembler.
+disasm.wren now finds names for GLOBAL_FETCH and GLOBAL_STORE.
+disasm.wren bug fix: SETB was printed as SETX
+
+===============================================================================
+PR#7 2018-10-10
 
 Sandboxing progress...
 

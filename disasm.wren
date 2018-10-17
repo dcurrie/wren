@@ -18,7 +18,7 @@ fun dis_value bytes =
     else 0
 
 fun dis_fun_lookup addr hdr =
-    if hdr < d0 then (
+    if hdr < dz then (
         if addr = (refx hdr) then
             put_name hdr
         else
@@ -26,7 +26,10 @@ fun dis_fun_lookup addr hdr =
     else (  # didn't find it, so just print address 
         puts '0x'; putx addr)
 
-fun dis_call_arity addr = *(c0 + addr)
+fun dis_call_arity addr = *addr
+
+fun dis_global =
+    dis_fun_lookup (refx dis_pc) dp; dis_pc : dis_pc + 2
 
 fun dis_call =
     puts 'TO: '; dis_fun_lookup (refx dis_pc) dp;
@@ -40,8 +43,8 @@ fun dis_op val =
     else if val = 0x26 then (puts 'PUSHB 0x'; putx (dis_value 1))
     else if val = 0x02 then  puts 'POP'
     else if val = 0x03 then (puts 'PUSH_STRING "' ; dis_string ; puts '"')
-    else if val = 0x04 then (puts 'GLOBAL_FETCH ' ; putd (dis_value 2))
-    else if val = 0x05 then (puts 'GLOBAL_STORE ' ; putd (dis_value 2))
+    else if val = 0x04 then (puts 'GLOBAL_FETCH ' ; dis_global)
+    else if val = 0x05 then (puts 'GLOBAL_STORE ' ; dis_global)
     else if val = 0x06 then (puts 'LOCAL_FETCH '  ; putd (dis_value 1))
     else if val = 0x07 then (puts 'TCALL '        ; dis_call)
     else if val = 0x08 then (puts 'CALL '         ; dis_call)
@@ -76,7 +79,7 @@ fun dis_op val =
     else if val = 0x24 then  puts 'LOCAL_FETCH_1'
     else if val = 0x28 then  puts 'REFX'
     else if val = 0x29 then  puts 'SETX'
-    else if val = 0x2a then  puts 'SETX'
+    else if val = 0x2a then  puts 'SETB'
     else (puts 'UNKNOWN: 0x' ; putx val; dis_pc : 0)
 
 
@@ -87,7 +90,7 @@ fun dis_help =
 fun dasm str =
     dis_pc : find str;
     cr; puts str ; puts ' arity: '; putd *dis_pc; 
-    dis_pc : (dis_pc+1); puts ' at: 0x'; putx (dis_pc - c0);
+    dis_pc : (dis_pc+1); puts ' at: 0x'; putx dis_pc;
     cr; dis_help
 
 # Nice little header

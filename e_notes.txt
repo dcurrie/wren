@@ -1,46 +1,19 @@
 
 Bugs:
 
-X disasm.wren and boot.wren assumes little endian; maybe we need peek2 (refx)
-
-X boot.wren could use * (i.e., fetch_byte) in place of peek in a couple places
-
-  Try to eliminate (or rename) get_xt (it adds c0 and isn't really necessary)
-
-  Look at uses of c0; see Sandboxing below
-
-  Convert "cp" to "cx" and "dp" to "dx"?
-
-X Rename FETCH_BYTE PEEK POKE to REFB REFV SETV and add REFX SETX SETB
-X where B is Byte X is indeX and V is Value
-X all take wIndex offsets into the_store.
-X PEEKB *
-X PEEKX refx
-X PEEKV refv
-X POKEB setb
-X POKEX setx
-X POKEV setv
 
 Sandboxing:
-
-X Consider converting from addresses to offsets everywhere inside the_store
-X  -- the exception would be CCALL addresses
-X  -- pay attention to PUSH_STRING which pushes an address now
-
-X Convert wValue to int32_t
-X  -- requires gen_pointer and write_wP to make wren_bind_c_function work
-X  -- requires                 fetch_wP to make CCALL work
-
-X Check all peek and poke operations to be within the_store;
 
 What other operations would need a bounds check?
 
 Replace assert() with something that longjmps to reset wren
 
+Make poke operations optional? (setb setx setv) (See array syntax below.)
+
 Extending:
 
-disasm.wren could try to find names for GLOBAL_FETCH and GLOBAL_STORE
-(BTW, consider renaming to SETG and REFG for compatibility with REF/SET prims?)
+Consider renaming GLOBAL_FETCH and GLOBAL_STORE to SETG and REFG for 
+compatibility with REF/SET prims
 
 Consider encoding string length after PUSH_STRING to avoid strlen()
 
